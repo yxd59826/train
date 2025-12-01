@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双眼融合训练器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .controls {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+        }
+        select, button, input[type="range"] {
+            padding: 8px 15px;
+            font-size: 14px;
+            border-radius: 5px;
+            border: none;
+            background: #3a3a3a;
+            color: #fff;
+            cursor: pointer;
+        }
+        button {
+            background: #4CAF50;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        input[type="range"] {
+            width: 200px;
+            vertical-align: middle;
+        }
+        .value-display {
+            display: inline-block;
+            min-width: 40px;
+            margin-left: 10px;
+        }
+        #canvas-container {
+            display: flex;
+            justify-content: center;
+            background: #000;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .instructions {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .warning {
+            background: #ff6b6b;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔴🔵 双眼融合训练器</h1>
+            <p>请戴上红蓝眼镜(红色在左眼,蓝色在右眼)</p>
+        </div>
+
+        <div class="warning">
+            ⚠️ <strong>重要提示:</strong> 
+            <ul style="margin: 10px 0;">
+                <li>首次使用建议从简单模式开始,每次训练10-15分钟</li>
+                <li>如感到不适、头晕或眼睛疲劳,请立即停止</li>
+                <li>本训练器不能替代医学治疗,建议在医生指导下使用</li>
+            </ul>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>训练模式:</label>
+                <select id="modeSelect">
+                    <option value="fusion">融合训练 - 同心圆</option>
+                    <option value="tracking">追踪训练 - 移动目标</option>
+                    <option value="depth">深度训练 - 3D空间</option>
+                    <option value="convergence">集合训练 - 靠近/远离</option>
+                    <option value="grid">网格训练 - 对齐练习</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>难度:</label>
+                <select id="difficultySelect">
+                    <option value="easy">简单</option>
+                    <option value="medium" selected>中等</option>
+                    <option value="hard">困难</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>立体深度:</label>
+                <input type="range" id="depthSlider" min="5" max="50" value="20">
+                <span class="value-display" id="depthValue">20</span>
+            </div>
+
+            <div class="control-group">
+                <label>速度:</label>
+                <input type="range" id="speedSlider" min="1" max="10" value="5">
+                <span class="value-display" id="speedValue">5</span>
+            </div>
+
+            <div class="control-group">
+                <button onclick="toggleTraining()">开始/暂停</button>
+                <button onclick="resetTraining()">重置</button>
+            </div>
+
+            <div class="control-group">
+                <label>训练时间:</label>
+                <span id="timer">00:00</span>
+            </div>
+        </div>
+
+        <div id="canvas-container"></div>
+
+        <div class="instructions">
+            <h3>📖 使用说明</h3>
+            <h4>各模式说明:</h4>
+            <ul>
+                <li><strong>融合训练:</strong> 尝试将两个同心圆融合成一个立体圆环</li>
+                <li><strong>追踪训练:</strong> 跟踪移动的立体目标,保持双眼协调</li>
+                <li><strong>深度训练:</strong> 观察3D空间中的物体,感受深度变化</li>
+                <li><strong>集合训练:</strong> 物体会靠近和远离,训练双眼集合与发散能力</li>
+                <li><strong>网格训练:</strong> 尝试将网格对齐,练习精细融合控制</li>
+            </ul>
+            <h4>训练技巧:</h4>
+            <ul>
+                <li>保持轻松的观看状态,不要过度用力</li>
+                <li>如果看到重影,尝试调整立体深度参数</li>
+                <li>从简单模式开始,逐步增加难度</li>
+                <li>定期眨眼,避免眼睛干涩</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let mode = 'fusion';
+        let difficulty = 'medium';
+        let depth = 20;
+        let speed = 5;
+        let isRunning = false;
+        let startTime = 0;
+        let elapsedTime = 0;
+        let timerInterval;
+
+        // 训练参数
+        let targetX, targetY, targetZ;
+        let targetVelX = 2, targetVelY = 2, targetVelZ = 0.5;
+        let convergencePhase = 0;
+        let particles = [];
+
+        function setup() {
+            let canvas = createCanvas(800, 600, WEBGL);
+            canvas.parent('canvas-container');
+            
+            targetX = 0;
+            targetY = 0;
+            targetZ = 0;
+            
+            // 初始化粒子
+            for (let i = 0; i < 20; i++) {
+                particles.push({
+                    x: random(-200, 200),
+                    y: random(-200, 200),
+                    z: random(-200, 200),
+                    velX: random(-1, 1),
+                    velY: random(-1, 1),
+                    velZ: random(-1, 1)
+                });
+            }
+        }
+
+        function draw() {
+            background(0);
+            
+            if (!isRunning) return;
+
+            // 根据模式绘制不同内容
+            switch(mode) {
+                case 'fusion':
+                    drawFusionMode();
+                    break;
+                case 'tracking':
+                    drawTrackingMode();
+                    break;
+                case 'depth':
+                    drawDepthMode();
+                    break;
+                case 'convergence':
+                    drawConvergenceMode();
+                    break;
+                case 'grid':
+                    drawGridMode();
+                    break;
+            }
+        }
+
+        function drawFusionMode() {
+            // 绘制左眼视图(红色)
+            drawAnaglyphView('left');
+            push();
+            translate(-depth, 0, 0);
+            stroke(255, 0, 0);
+            noFill();
+            strokeWeight(3);
+            circle(0, 0, 100);
+            circle(0, 0, 150);
+            circle(0, 0, 200);
+            // 添加中心点
+            fill(255, 0, 0);
+            noStroke();
+            circle(0, 0, 10);
+            pop();
+
+            // 绘制右眼视图(青色)
+            drawAnaglyphView('right');
+            push();
+            translate(depth, 0, 0);
+            stroke(0, 255, 255);
+            noFill();
+            strokeWeight(3);
+            circle(0, 0, 100);
+            circle(0, 0, 150);
+            circle(0, 0, 200);
+            // 添加中心点
+            fill(0, 255, 255);
+            noStroke();
+            circle(0, 0, 10);
+            pop();
+        }
+
+        function drawTrackingMode() {
+            // 更新目标位置
+            targetX += targetVelX * speed * 0.5;
+            targetY += targetVelY * speed * 0.5;
+            
+            // 边界反弹
+            if (targetX > 300 || targetX < -300) targetVelX *= -1;
+            if (targetY > 200 || targetY < -200) targetVelY *= -1;
+
+            let size = difficulty === 'easy' ? 60 : difficulty === 'medium' ? 40 : 25;
+
+            // 左眼视图
+            drawAnaglyphView('left');
+            push();
+            translate(targetX - depth, targetY, 0);
+            fill(255, 0, 0);
+            noStroke();
+            sphere(size);
+            pop();
+
+            // 右眼视图
+            drawAnaglyphView('right');
+            push();
+            translate(targetX + depth, targetY, 0);
+            fill(0, 255, 255);
+            noStroke();
+            sphere(size);
+            pop();
+        }
+
+        function drawDepthMode() {
+            // 更新粒子
+            particles.forEach(p => {
+                p.x += p.velX * speed * 0.3;
+                p.y += p.velY * speed * 0.3;
+                p.z += p.velZ * speed * 0.3;
+                
+                if (p.x > 300 || p.x < -300) p.velX *= -1;
+                if (p.y > 250 || p.y < -250) p.velY *= -1;
+                if (p.z > 200 || p.z < -200) p.velZ *= -1;
+            });
+
+            // 绘制粒子 - 左眼
+            drawAnaglyphView('left');
+            particles.forEach(p => {
+                push();
+                translate(p.x - depth * (p.z / 200), p.y, p.z);
+                fill(255, 0, 0);
+                noStroke();
+                sphere(15);
+                pop();
+            });
+
+            // 绘制粒子 - 右眼
+            drawAnaglyphView('right');
+            particles.forEach(p => {
+                push();
+                translate(p.x + depth * (p.z / 200), p.y, p.z);
+                fill(0, 255, 255);
+                noStroke();
+                sphere(15);
+                pop();
+            });
+        }
+
+        function drawConvergenceMode() {
+            // 周期性靠近和远离
+            convergencePhase += 0.02 * speed;
+            let dynamicZ = sin(convergencePhase) * 150;
+            let dynamicDepth = depth * (1 + dynamicZ / 200);
+
+            let size = 50;
+
+            // 左眼
+            drawAnaglyphView('left');
+            push();
+            translate(-dynamicDepth, 0, dynamicZ);
+            fill(255, 0, 0);
+            noStroke();
+            sphere(size);
+            pop();
+
+            // 右眼
+            drawAnaglyphView('right');
+            push();
+            translate(dynamicDepth, 0, dynamicZ);
+            fill(0, 255, 255);
+            noStroke();
+            sphere(size);
+            pop();
+        }
+
+        function drawGridMode() {
+            let gridSize = difficulty === 'easy' ? 80 : difficulty === 'medium' ? 50 : 30;
+            let offset = sin(frameCount * 0.02 * speed) * 20;
+
+            // 左眼网格
+            drawAnaglyphView('left');
+            push();
+            translate(-depth + offset, 0, 0);
+            stroke(255, 0, 0);
+            strokeWeight(2);
+            noFill();
+            for (let x = -300; x <= 300; x += gridSize) {
+                line(x, -250, x, 250);
+            }
+            for (let y = -250; y <= 250; y += gridSize) {
+                line(-300, y, 300, y);
+            }
+            pop();
+
+            // 右眼网格
+            drawAnaglyphView('right');
+            push();
+            translate(depth - offset, 0, 0);
+            stroke(0, 255, 255);
+            strokeWeight(2);
+            noFill();
+            for (let x = -300; x <= 300; x += gridSize) {
+                line(x, -250, x, 250);
+            }
+            for (let y = -250; y <= 250; y += gridSize) {
+                line(-300, y, 300, y);
+            }
+            pop();
+        }
+
+        function drawAnaglyphView(eye) {
+            if (eye === 'left') {
+                drawingContext.globalCompositeOperation = 'source-over';
+            } else {
+                drawingContext.globalCompositeOperation = 'lighter';
+            }
+        }
+
+        // 控制函数
+        function toggleTraining() {
+            isRunning = !isRunning;
+            if (isRunning && startTime === 0) {
+                startTime = Date.now();
+                timerInterval = setInterval(updateTimer, 1000);
+            } else if (!isRunning) {
+                clearInterval(timerInterval);
+            }
+        }
+
+        function resetTraining() {
+            isRunning = false;
+            startTime = 0;
+            elapsedTime = 0;
+            clearInterval(timerInterval);
+            document.getElementById('timer').textContent = '00:00';
+            targetX = 0;
+            targetY = 0;
+            convergencePhase = 0;
+        }
+
+        function updateTimer() {
+            if (isRunning) {
+                elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                let minutes = Math.floor(elapsedTime / 60);
+                let seconds = elapsedTime % 60;
+                document.getElementById('timer').textContent = 
+                    String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            }
+        }
+
+        // 事件监听
+        document.getElementById('modeSelect').addEventListener('change', (e) => {
+            mode = e.target.value;
+        });
+
+        document.getElementById('difficultySelect').addEventListener('change', (e) => {
+            difficulty = e.target.value;
+        });
+
+        document.getElementById('depthSlider').addEventListener('input', (e) => {
+            depth = parseInt(e.target.value);
+            document.getElementById('depthValue').textContent = depth;
+        });
+
+        document.getElementById('speedSlider').addEventListener('input', (e) => {
+            speed = parseInt(e.target.value);
+            document.getElementById('speedValue').textContent = speed;
+        });
+    </script>
+</body>
+</html>
