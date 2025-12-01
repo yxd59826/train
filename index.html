@@ -27,6 +27,9 @@
             border-radius: 10px;
             margin-bottom: 20px;
         }
+        .controls.hidden {
+            display: none;
+        }
         .control-group {
             margin-bottom: 15px;
         }
@@ -66,12 +69,54 @@
             background: #000;
             border-radius: 10px;
             padding: 20px;
+            position: relative;
+        }
+        #canvas-container.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            border-radius: 0;
+            padding: 0;
         }
         .instructions {
             background: #2a2a2a;
             padding: 15px;
             border-radius: 10px;
             margin-top: 20px;
+        }
+        .instructions.hidden {
+            display: none;
+        }
+        .fullscreen-btn {
+            background: #2196F3;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        .fullscreen-btn:hover {
+            background: #1976D2;
+        }
+        .exit-fullscreen {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            background: rgba(244, 67, 54, 0.9);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+        .exit-fullscreen.show {
+            display: block;
+        }
+        .exit-fullscreen:hover {
+            background: rgba(211, 47, 47, 0.9);
         }
         .warning {
             background: #ff6b6b;
@@ -132,8 +177,15 @@
             </div>
 
             <div class="control-group">
+                <label>图案大小:</label>
+                <input type="range" id="scaleSlider" min="50" max="200" value="100">
+                <span class="value-display" id="scaleValue">100%</span>
+            </div>
+
+            <div class="control-group">
                 <button onclick="toggleTraining()">开始/暂停</button>
                 <button onclick="resetTraining()">重置</button>
+                <button class="fullscreen-btn" onclick="enterFullscreen()">📺 全屏训练</button>
             </div>
 
             <div class="control-group">
@@ -143,6 +195,8 @@
         </div>
 
         <div id="canvas-container"></div>
+
+        <button class="exit-fullscreen" id="exitFullscreenBtn">❌ 退出全屏 (按 ESC)</button>
 
         <div class="instructions">
             <h3>📖 使用说明</h3>
@@ -179,9 +233,13 @@
         let targetVelX = 2, targetVelY = 2, targetVelZ = 0.5;
         let convergencePhase = 0;
         let particles = [];
+        let canvasWidth = 1200;
+        let canvasHeight = 800;
+        let isFullscreen = false;
+        let scaleMultiplier = 1.0;
 
         function setup() {
-            let canvas = createCanvas(800, 600, WEBGL);
+            let canvas = createCanvas(canvasWidth, canvasHeight, WEBGL);
             canvas.parent('canvas-container');
             
             targetX = 0;
@@ -234,13 +292,13 @@
             stroke(255, 0, 0);
             noFill();
             strokeWeight(3);
-            circle(0, 0, 100);
-            circle(0, 0, 150);
-            circle(0, 0, 200);
+            circle(0, 0, 100 * scaleMultiplier);
+            circle(0, 0, 150 * scaleMultiplier);
+            circle(0, 0, 200 * scaleMultiplier);
             // 添加中心点
             fill(255, 0, 0);
             noStroke();
-            circle(0, 0, 10);
+            circle(0, 0, 10 * scaleMultiplier);
             pop();
 
             // 绘制右眼视图(青色)
@@ -250,13 +308,13 @@
             stroke(0, 255, 255);
             noFill();
             strokeWeight(3);
-            circle(0, 0, 100);
-            circle(0, 0, 150);
-            circle(0, 0, 200);
+            circle(0, 0, 100 * scaleMultiplier);
+            circle(0, 0, 150 * scaleMultiplier);
+            circle(0, 0, 200 * scaleMultiplier);
             // 添加中心点
             fill(0, 255, 255);
             noStroke();
-            circle(0, 0, 10);
+            circle(0, 0, 10 * scaleMultiplier);
             pop();
         }
 
@@ -269,7 +327,7 @@
             if (targetX > 300 || targetX < -300) targetVelX *= -1;
             if (targetY > 200 || targetY < -200) targetVelY *= -1;
 
-            let size = difficulty === 'easy' ? 60 : difficulty === 'medium' ? 40 : 25;
+            let size = (difficulty === 'easy' ? 60 : difficulty === 'medium' ? 40 : 25) * scaleMultiplier;
 
             // 左眼视图
             drawAnaglyphView('left');
@@ -309,7 +367,7 @@
                 translate(p.x - depth * (p.z / 200), p.y, p.z);
                 fill(255, 0, 0);
                 noStroke();
-                sphere(15);
+                sphere(15 * scaleMultiplier);
                 pop();
             });
 
@@ -320,7 +378,7 @@
                 translate(p.x + depth * (p.z / 200), p.y, p.z);
                 fill(0, 255, 255);
                 noStroke();
-                sphere(15);
+                sphere(15 * scaleMultiplier);
                 pop();
             });
         }
@@ -331,7 +389,7 @@
             let dynamicZ = sin(convergencePhase) * 150;
             let dynamicDepth = depth * (1 + dynamicZ / 200);
 
-            let size = 50;
+            let size = 50 * scaleMultiplier;
 
             // 左眼
             drawAnaglyphView('left');
@@ -427,6 +485,54 @@
             }
         }
 
+        // 全屏功能
+        function enterFullscreen() {
+            isFullscreen = true;
+            canvasWidth = windowWidth;
+            canvasHeight = windowHeight;
+            resizeCanvas(canvasWidth, canvasHeight);
+            
+            document.getElementById('canvas-container').classList.add('fullscreen');
+            document.getElementById('exitFullscreenBtn').classList.add('show');
+            document.querySelector('.controls').classList.add('hidden');
+            document.querySelector('.instructions').classList.add('hidden');
+            document.querySelector('.warning').classList.add('hidden');
+            document.querySelector('.header').classList.add('hidden');
+        }
+
+        function exitFullscreen() {
+            isFullscreen = false;
+            canvasWidth = 1200;
+            canvasHeight = 800;
+            resizeCanvas(canvasWidth, canvasHeight);
+            
+            document.getElementById('canvas-container').classList.remove('fullscreen');
+            document.getElementById('exitFullscreenBtn').classList.remove('show');
+            document.querySelector('.controls').classList.remove('hidden');
+            document.querySelector('.instructions').classList.remove('hidden');
+            document.querySelector('.warning').classList.remove('hidden');
+            document.querySelector('.header').classList.remove('hidden');
+        }
+
+        // 退出全屏按钮事件
+        document.getElementById('exitFullscreenBtn').addEventListener('click', exitFullscreen);
+
+        // ESC键退出全屏
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isFullscreen) {
+                exitFullscreen();
+            }
+        });
+
+        // 窗口大小改变时调整全屏画布
+        function windowResized() {
+            if (isFullscreen) {
+                canvasWidth = windowWidth;
+                canvasHeight = windowHeight;
+                resizeCanvas(canvasWidth, canvasHeight);
+            }
+        }
+
         // 事件监听
         document.getElementById('modeSelect').addEventListener('change', (e) => {
             mode = e.target.value;
@@ -444,6 +550,12 @@
         document.getElementById('speedSlider').addEventListener('input', (e) => {
             speed = parseInt(e.target.value);
             document.getElementById('speedValue').textContent = speed;
+        });
+
+        document.getElementById('scaleSlider').addEventListener('input', (e) => {
+            let scalePercent = parseInt(e.target.value);
+            scaleMultiplier = scalePercent / 100;
+            document.getElementById('scaleValue').textContent = scalePercent + '%';
         });
     </script>
 </body>
